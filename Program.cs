@@ -7,8 +7,20 @@ namespace LabWork
     /// </summary>
     public readonly struct Point
     {
+        /// <summary>
+        /// Gets the X coordinate.
+        /// </summary>
         public double X { get; }
+
+        /// <summary>
+        /// Gets the Y coordinate.
+        /// </summary>
         public double Y { get; }
+
+        /// <summary>
+        /// Initializes a new instance of the Point struct with default coordinates (0,0).
+        /// </summary>
+        public Point() : this(0, 0) { }
 
         /// <summary>
         /// Initializes a new instance of the Point struct.
@@ -29,37 +41,54 @@ namespace LabWork
     /// </summary>
     public class Triangle
     {
-        protected Point[] vertices;
-        protected bool _isInitialized;
+        private readonly Point[] _vertices;
+        private bool _isInitialized;
 
         /// <summary>
         /// Initializes a new instance of the Triangle class.
         /// </summary>
         public Triangle()
         {
-            vertices = new Point[3];
+            _vertices = new Point[3];
             _isInitialized = false;
+        }
+
+        /// <summary>
+        /// Gets a copy of the triangle's vertices.
+        /// </summary>
+        /// <returns>Array of vertices</returns>
+        protected Point[] GetVertices()
+        {
+            return (Point[])_vertices.Clone();
+        }
+
+        /// <summary>
+        /// Calculates the area of a triangle formed by three points.
+        /// </summary>
+        private static double CalculateTriangleArea(Point p1, Point p2, Point p3)
+        {
+            return Math.Abs(
+                p1.X * (p2.Y - p3.Y) +
+                p2.X * (p3.Y - p1.Y) +
+                p3.X * (p1.Y - p2.Y)
+            ) / 2.0;
         }
 
         /// <summary>
         /// Checks if three points form a valid triangle by verifying they're not collinear.
         /// </summary>
-        /// <param name="p1">First point</param>
-        /// <param name="p2">Second point</param>
-        /// <param name="p3">Third point</param>
-        /// <returns>True if points form a valid triangle, false otherwise</returns>
-        protected bool IsValidTriangle(Point p1, Point p2, Point p3)
+        private static bool IsValidTriangle(Point p1, Point p2, Point p3)
         {
-            // Calculate the area using the formula: 
-            // Area = 1/2 * |x1(y2 - y3) + x2(y3 - y1) + x3(y1 - y2)|
-            double area = Math.Abs(
-                p1.X * (p2.Y - p3.Y) +
-                p2.X * (p3.Y - p1.Y) +
-                p3.X * (p1.Y - p2.Y)
-            ) / 2.0;
+            const double Epsilon = 1e-10;
+            return CalculateTriangleArea(p1, p2, p3) > Epsilon;
+        }
 
-            // If area is zero, points are collinear
-            return area > 1e-10; // Using small epsilon for floating-point comparison
+        /// <summary>
+        /// Calculates the distance between two points.
+        /// </summary>
+        private static double CalculateDistance(Point p1, Point p2)
+        {
+            return Math.Sqrt(Math.Pow(p2.X - p1.X, 2) + Math.Pow(p2.Y - p1.Y, 2));
         }
 
         /// <summary>
@@ -76,9 +105,9 @@ namespace LabWork
                 throw new ArgumentException("The given points do not form a valid triangle (they may be collinear)");
             }
 
-            vertices[0] = p1;
-            vertices[1] = p2;
-            vertices[2] = p3;
+            _vertices[0] = p1;
+            _vertices[1] = p2;
+            _vertices[2] = p3;
             _isInitialized = true;
         }
 
@@ -87,24 +116,25 @@ namespace LabWork
         /// </summary>
         public virtual void DisplayVertices()
         {
-            if (!_isInitialized)
-            {
-                throw new InvalidOperationException("Triangle coordinates have not been initialized");
-            }
+            ValidateInitialization();
 
             Console.WriteLine("Triangle vertices:");
             for (int i = 0; i < 3; i++)
             {
-                Console.WriteLine($"Vertex {i + 1}: {vertices[i]}");
+                Console.WriteLine($"Vertex {i + 1}: {_vertices[i]}");
             }
         }
 
         /// <summary>
-        /// Calculates the distance between two points.
+        /// Validates that the triangle has been properly initialized.
         /// </summary>
-        protected double CalculateDistance(Point p1, Point p2)
+        /// <exception cref="InvalidOperationException">Thrown when the triangle is not initialized</exception>
+        protected void ValidateInitialization()
         {
-            return Math.Sqrt(Math.Pow(p2.X - p1.X, 2) + Math.Pow(p2.Y - p1.Y, 2));
+            if (!_isInitialized)
+            {
+                throw new InvalidOperationException("Triangle coordinates have not been initialized");
+            }
         }
 
         /// <summary>
@@ -114,21 +144,17 @@ namespace LabWork
         /// <exception cref="InvalidOperationException">Thrown when coordinates haven't been set</exception>
         public virtual double CalculateArea()
         {
-            if (!_isInitialized)
-            {
-                throw new InvalidOperationException("Cannot calculate area: triangle coordinates have not been initialized");
-            }
+            ValidateInitialization();
 
             // Calculate sides using the distance formula
-            double a = CalculateDistance(vertices[0], vertices[1]);
-            double b = CalculateDistance(vertices[1], vertices[2]);
-            double c = CalculateDistance(vertices[2], vertices[0]);
+            double a = CalculateDistance(_vertices[0], _vertices[1]);
+            double b = CalculateDistance(_vertices[1], _vertices[2]);
+            double c = CalculateDistance(_vertices[2], _vertices[0]);
 
             // Calculate semi-perimeter
             double s = (a + b + c) / 2;
 
             // Calculate area using Heron's formula: A = √(s(s-a)(s-b)(s-c))
-            // where s is the semi-perimeter and a, b, c are the sides of the triangle
             return Math.Sqrt(s * (s - a) * (s - b) * (s - c));
         }
     }
@@ -138,6 +164,7 @@ namespace LabWork
     /// </summary>
     public class Tetrahedron : Triangle
     {
+        private readonly Point _defaultApexPoint = new Point(0, 0);
         private Point _fourthVertex;
         private double _height;
         private bool _tetrahedronInitialized;
@@ -147,14 +174,32 @@ namespace LabWork
         /// </summary>
         public Tetrahedron() : base()
         {
-            _fourthVertex = new Point();
+            _fourthVertex = _defaultApexPoint;
             _tetrahedronInitialized = false;
+        }
+
+        /// <summary>
+        /// Checks if a point lies in the plane of the base triangle.
+        /// </summary>
+        private bool IsPointInBasePlane(Point point)
+        {
+            Point[] baseVertices = GetVertices();
+            // If the point forms a valid triangle with any two vertices of the base,
+            // and these triangles' total area equals the base triangle's area,
+            // then the point lies in the plane
+            double baseArea = CalculateTriangleArea(baseVertices[0], baseVertices[1], baseVertices[2]);
+            double area1 = CalculateTriangleArea(point, baseVertices[1], baseVertices[2]);
+            double area2 = CalculateTriangleArea(baseVertices[0], point, baseVertices[2]);
+            double area3 = CalculateTriangleArea(baseVertices[0], baseVertices[1], point);
+            
+            const double Epsilon = 1e-10;
+            return Math.Abs(baseArea - (area1 + area2 + area3)) < Epsilon;
         }
 
         /// <summary>
         /// Sets the coordinates of the tetrahedron's vertices and its height.
         /// </summary>
-        /// <exception cref="ArgumentException">Thrown when height is invalid or points don't form a valid base</exception>
+        /// <exception cref="ArgumentException">Thrown when height is invalid or points don't form a valid tetrahedron</exception>
         public void SetCoordinates(Point p1, Point p2, Point p3, Point p4, double height)
         {
             if (height <= 0)
@@ -165,6 +210,12 @@ namespace LabWork
             // First set the base triangle coordinates (this will validate the triangle)
             base.SetCoordinates(p1, p2, p3);
             
+            // Verify that the fourth point doesn't lie in the base plane
+            if (IsPointInBasePlane(p4))
+            {
+                throw new ArgumentException("The fourth vertex cannot lie in the same plane as the base triangle");
+            }
+
             _fourthVertex = p4;
             _height = height;
             _tetrahedronInitialized = true;
@@ -181,9 +232,10 @@ namespace LabWork
             }
 
             Console.WriteLine("Tetrahedron vertices:");
+            Point[] baseVertices = GetVertices();
             for (int i = 0; i < 3; i++)
             {
-                Console.WriteLine($"Base vertex {i + 1}: {vertices[i]}");
+                Console.WriteLine($"Base vertex {i + 1}: {baseVertices[i]}");
             }
             Console.WriteLine($"Apex vertex: {_fourthVertex}");
             Console.WriteLine($"Height: {_height}");
@@ -202,8 +254,7 @@ namespace LabWork
             }
 
             // Volume of a tetrahedron = (1/3) * base area * height
-            double baseArea = base.CalculateArea();
-            return (1.0 / 3.0) * baseArea * _height;
+            return (1.0 / 3.0) * CalculateArea() * _height;
         }
     }
 
@@ -277,6 +328,22 @@ namespace LabWork
                     Console.WriteLine($"Expected error: {ex.Message}");
                 }
 
+                // Try with fourth point in base plane
+                try
+                {
+                    tetrahedron.SetCoordinates(
+                        new Point(0, 0),
+                        new Point(3, 0),
+                        new Point(0, 4),
+                        new Point(1.5, 2),  // Point in the base plane
+                        5.0
+                    );
+                }
+                catch (ArgumentException ex)
+                {
+                    Console.WriteLine($"Expected error: {ex.Message}");
+                }
+
                 // Set valid tetrahedron coordinates
                 tetrahedron.SetCoordinates(
                     new Point(0, 0),
@@ -289,6 +356,17 @@ namespace LabWork
                 tetrahedron.DisplayVertices();
                 double volume = tetrahedron.CalculateVolume();
                 Console.WriteLine($"Tetrahedron volume: {volume:F2} cubic units");
+
+                // Test default constructor behavior
+                Tetrahedron defaultTetrahedron = new Tetrahedron();
+                try
+                {
+                    defaultTetrahedron.DisplayVertices();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Console.WriteLine($"\nExpected error with default constructor: {ex.Message}");
+                }
             }
             catch (Exception ex)
             {
